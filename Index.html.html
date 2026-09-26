@@ -1,0 +1,296 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Client Group — Operating Model Roadmap</title>
+<style>
+:root{
+ --bg:#cfd2d5;--bg2:#e3e5e7;--bg3:#bfc3c7;
+ --ink:#dce7f2;--panel-bg:rgba(10,24,40,.97);--panel-border:#47637b;
+ --top-bg:rgba(12,29,48,.96);--top-border:#46647e;
+ --line:#5c7286;--line-flow:#b06a6a;--line-control:#5f8a71;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--ink);overscroll-behavior:none}
+body{background:radial-gradient(circle at 50% 30%,var(--bg2) 0,var(--bg) 55%,var(--bg3) 100%);
+ padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+#canvas{position:absolute;inset:0;top:env(safe-area-inset-top,0px);bottom:env(safe-area-inset-bottom,0px);overflow:hidden;cursor:grab;touch-action:none}
+#canvas.drag{cursor:grabbing}
+#zoom{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+#world{position:relative}
+svg#edges{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+.node{position:absolute;width:150px;padding:10px 12px;border-radius:11px;
+ background:linear-gradient(145deg,#183f69,#0b2748);border:1px solid rgba(160,195,225,.55);
+ box-shadow:0 10px 22px rgba(20,34,50,.35),inset 0 1px rgba(255,255,255,.15);
+ color:#fff;cursor:pointer;user-select:none;transition:box-shadow .15s,transform .15s;text-align:center}
+.node:active,.node.sel{outline:2px solid #d6e8f7;transform:translateY(-2px);box-shadow:0 14px 28px rgba(20,34,50,.5)}
+.node .type{font-size:8.5px;letter-spacing:.1em;color:#a9c5de;margin-bottom:5px}
+.node .name{font-weight:700;font-size:12.5px;line-height:1.2}
+.node.control{background:linear-gradient(145deg,#356249,#203e30);border-color:#9fc2a9}
+.node.process{background:linear-gradient(145deg,#38658d,#244a6c)}
+.node.business{background:linear-gradient(145deg,#204e80,#16395e)}
+.node.system{background:linear-gradient(145deg,#163a62,#102d4d)}
+.node.gov{background:linear-gradient(145deg,#5c4a24,#3a2f18);border-color:#c9ab6a}
+.node.info{background:linear-gradient(145deg,#204d5e,#153540)}
+.node.future{background:linear-gradient(145deg,#183f69,#0b2748);border-style:dashed}
+#top{position:absolute;left:10px;right:10px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:10;
+ background:var(--top-bg);border:1px solid var(--top-border);border-radius:13px;padding:10px 12px;box-shadow:0 12px 28px #0003}
+#top h1{font-size:13.5px;margin:0 0 3px}
+#top .sub{font-size:9.5px;color:#9fb3c5;line-height:1.3}
+#btnrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+button{background:#1d4e7c;color:#fff;border:1px solid #557997;border-radius:7px;padding:6px 9px;cursor:pointer;font-size:10px;white-space:nowrap}
+button:hover{background:#286596}
+button.active{background:#2f7bb5;border-color:#7db3dd}
+#zoomctl{position:absolute;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);z-index:10;display:flex;flex-direction:column;gap:6px}
+#zoomctl button{width:36px;height:36px;font-size:16px;border-radius:9px}
+#hint{position:absolute;left:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);z-index:10;
+ background:rgba(245,247,249,.92);color:#26384a;padding:7px 10px;border-radius:10px;font-size:9.5px;border:1px solid #aeb5bc;max-width:150px}
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--panel-bg);border-top:1px solid var(--panel-border);
+ border-radius:16px 16px 0 0;max-height:72vh;transform:translateY(100%);transition:transform .28s ease;
+ box-shadow:0 -12px 30px #0005;padding-bottom:env(safe-area-inset-bottom,0px)}
+#sheet.open{transform:translateY(0)}
+#sheet .grab{width:36px;height:4px;background:#3d5670;border-radius:3px;margin:9px auto 4px}
+#sheet .in{padding:6px 20px 22px;overflow:auto;max-height:calc(72vh - 20px)}
+#sheet .eyebrow{font-size:9px;letter-spacing:.12em;color:#86a9c7}
+#sheet h2{margin:5px 0 10px;font-size:18px}
+#sheet .section{margin-top:14px}
+#sheet .section h3{font-size:9.5px;letter-spacing:.1em;color:#87a9c3;margin:0 0 6px}
+#sheet p,#sheet li{font-size:12px;line-height:1.48;color:#c8d5e0}
+#sheet ul{margin:6px 0;padding-left:18px}
+.pill{display:inline-block;padding:4px 7px;border-radius:99px;background:#193c5f;color:#b9d4e9;font-size:10px;margin:2px 3px 0 0}
+.pill.green{background:#244a36;color:#c5dfcc}.pill.red{background:#552e2e;color:#e5bcbc}
+#closeSheet{position:absolute;right:14px;top:10px;background:none;border:none;color:#9fb3c5;font-size:18px;padding:4px 8px}
+#legend{position:absolute;left:10px;top:calc(env(safe-area-inset-top,0px) + 100px);z-index:9;
+ background:rgba(245,247,249,.92);color:#26384a;padding:7px 9px;border-radius:9px;font-size:8.5px;border:1px solid #aeb5bc;line-height:1.7}
+#legend span{display:inline-block;width:14px;height:0;border-top:2px solid;vertical-align:middle;margin-right:4px}
+@media(min-width:760px){
+ #top{width:400px;right:auto}
+ #sheet{left:auto;right:20px;bottom:20px;top:20px;width:380px;border-radius:15px;max-height:none;
+  transform:translateX(420px);transition:transform .25s ease}
+ #sheet.open{transform:translateX(0)}
+ #sheet .in{max-height:none;height:100%}
+}
+</style>
+</head>
+<body>
+<div id="canvas"><div id="zoom"><div id="world"><svg id="edges"></svg></div></div></div>
+
+<div id="top">
+ <h1>GROUP OPERATING MODEL — ROADMAP</h1>
+ <div class="sub">Future-state architecture · initial design · validate against current-state interviews</div>
+ <div id="btnrow">
+  <button onclick="home()">Reset view</button>
+  <button id="flowBtn" onclick="flows()">Transaction flows</button>
+  <button onclick="layer('org')">All</button>
+  <button onclick="layer('control')">Controls</button>
+  <button onclick="layer('finance')">Finance</button>
+ </div>
+</div>
+
+<div id="legend">
+ <div><span style="border-color:var(--line)"></span>reporting line</div>
+ <div><span style="border-color:var(--line-control);border-top-style:dashed"></span>control feed</div>
+ <div><span style="border-color:var(--line-flow)"></span>transaction flow</div>
+</div>
+
+<div id="zoomctl">
+ <button onclick="zoomBy(1.25)">+</button>
+ <button onclick="zoomBy(.8)">−</button>
+</div>
+<div id="hint">Drag to pan · pinch or wheel to zoom · tap a block to inspect</div>
+
+<div id="sheet">
+ <button id="closeSheet" onclick="closeSheet()">✕</button>
+ <div class="grab"></div>
+ <div class="in" id="content">
+  <div class="eyebrow">Operating model</div><h2>Tap any block</h2>
+  <p>Explore the organization as a living operating system. Each block contains its purpose, accountability, transaction flow, controls, risks and KPIs.</p>
+  <div class="section"><h3>Core architecture</h3><p><b>HQ governs → Warehouse distributes → Branches sell → Finance reconciles → ERP records the transaction once.</b></p></div>
+  <div class="section"><h3>Transaction spine</h3><p><b>Request → Approve / Allocate → Execute → Receive → Reconcile</b></p></div>
+  <div class="section"><h3>Cash spine</h3><p><b>POS → Daily Closing → Physical Count → Variance → Cash Transfer → Treasury → Bank</b></p></div>
+  <div class="section"><h3>Important</h3><p>Blue/gold blocks are operating/governance nodes. Green blocks are control/finance nodes. Read top to bottom: governance → control & systems → operating businesses → execution. Red arrows (toggle above) trace transaction/cash flow. This is a proposed future-state model, not a claim about the client's current reporting lines.</p></div>
+ </div>
+</div>
+
+<script>
+const data=[
+['owner','Owner / Shareholders','Governance','org',['Set strategy and ownership governance','Approve major authorities and capital decisions'],'Group governance apex','Management reporting; defined approval authorities',['Delegation of authority','Conflict-of-interest controls'],['Informal decisions bypassing process','Ownership mixed with operations'],['Group profitability','Working capital','Major exceptions']],
+['hq','Group HQ / Management','HQ','org',['Governance, policy, HR, IT/ERP, finance oversight, strategy','Set authority matrix and standards','Consolidate reporting'],'Reports to Owner / Shareholders','Cross-business governance and information hub',['Policy ownership','Authority matrix','Master-data governance'],['Unclear authority','Shadow processes','HQ bottleneck'],['Exception aging','Close cycle','Data quality']],
+['finance','Finance / Treasury','Control','finance',['AP/AR','Cash and bank reconciliation','Treasury','Cost/inventory accounting'],'Functional control under HQ','Reconcile operational evidence to cash, bank and ERP',['Daily cash reconciliation','Bank reconciliation','Inventory-to-GL'],['Cash leakage','Unreconciled items','Execution/reconciliation conflict'],['Cash variance','Unreconciled balance','Close accuracy']],
+['audit','Internal Control / Audit','Control','control',['Test controls and segregation of duties','Investigate exceptions','Track corrective actions'],'Independent challenge to management','Samples end-to-end transactions',['Exception log','Cycle counts','Surprise cash counts'],['No independent challenge','Recurring exceptions'],['Open exceptions','Repeat exceptions','Control pass rate']],
+['warehouse','Central Warehouse / Distribution','Operations','org',['Purchasing execution','Receiving and put-away','Inventory custody','Picking and dispatch','Batch/expiry and FEFO'],'Operationally separate from HQ','Demand → purchase → receive → stock → pick → dispatch → branch receive',['3-way receiving evidence','Cycle counts','Batch/expiry capture'],['Shrinkage','Wrong/expired stock','Dispatch without evidence'],['Inventory accuracy','Fill rate','Expiry exposure']],
+['purchasing','Purchasing / Procurement','Process','org',['Convert approved demand into supplier orders','Supplier documentation','Price/cost tracking'],'Execution role; approval remains separate','Approved request → PO → supplier → receiving → invoice → finance',['Approved supplier list','PO approval','3-way match'],['Unapproved buying','Price leakage','Conflicts'],['PPV','Supplier lead time','PO compliance']],
+['pharmacy','Pharmacy Network','Business','org',['Retail sales and customer service','Receive and custody stock','Daily count/closing','Request replenishment'],'Retail operational management','Request → allocation → dispatch → receive → sell → close → reconcile',['Restricted SKU/price changes','Cash count','Receiving confirmation'],['Cash leakage','Unauthorized discounts','Stock adjustments'],['Sales','Margin','Stock accuracy','Cash variance']],
+['pos','POS / Daily Closing','Process','org',['Record sales','Close trading day','Count physical cash','Document variance'],'Pharmacy execution; independent reconciliation','POS → close → physical count → variance → transfer → treasury',['Z report','Cashier/closer separation','Variance approval'],['Till manipulation','Delayed deposits'],['Daily variance','Deposit timeliness']],
+['master','Master Data & Pricing','Control','control',['Central SKU, barcode, batch/lot, expiry, cost/landed cost','Controlled price lists','Change governance'],'HQ governance; users consume approved data','Approved master → ERP/POS/Warehouse/BI',['No free SKU creation','Price approval','Change log'],['Duplicate SKU','Wrong margin','Unauthorized price change'],['Duplicate rate','Master errors']],
+['spine','Transaction Control Spine','Process','control',['Trace every important movement','Request → approve → execute → receive → reconcile','ERP as system of record'],'Cross-functional control principle','Connects physical, financial and information movement',['Unique transaction IDs','Status workflow','Evidence','Exception queue'],['WhatsApp-only','Paper-only','Excel shadow ledgers'],['Traceability %','Exception rate','Cycle time']],
+['gym','Gym Business Unit','Business','org',['Separate BU P&L and operating controls','Membership/revenue/expense management'],'Own operating manager; group standards from HQ','Customer transaction → collection → reconciliation → BU reporting',['Separate revenue streams','Payment reconciliation'],['Mixed cash','Hidden cross-subsidy'],['Revenue','Membership','Operating cost']],
+['future','Future Businesses / Entities','Business','org',['Separate legal entity/BU/location/cost center as applicable','Reuse group controls without forcing identical operations'],'Defined during expansion','New entity → approved operating model → master data → finance integration',['Entity setup','Intercompany rules','Cost centers'],['Blended P&Ls','Intercompany ambiguity'],['Entity profitability','Intercompany balance']],
+['bi','BI / Management Reporting','Information','finance',['Management view of sales, margin, cash, inventory, working capital, exceptions','Report by entity/BU/location/cost center'],'Feeds HQ and Owner','ERP → validated data → BI → management action',['Metric definitions','Data lineage','Period close'],['Multiple truths','Manual reporting'],['Timeliness','Completeness']],
+['erp','ERP / System of Record','System','control',['Record each transaction once','Enforce workflow, permissions and audit trail','Connect purchasing, inventory, POS, finance and reporting'],'Technology supports the operating model','Approved transactions → ERP → finance/BI/audit',['RBAC','Workflow','Audit trail','Period controls'],['Automating bad process','Excess permissions','Parallel spreadsheets'],['Completeness','Adoption','Reconciliation']],
+['ai','AI / Automation — Later','Future','org',['Demand forecasting','Dead stock / expiry','Cash anomalies','Margin anomalies','Purchasing intelligence'],'Decision support; humans retain accountability','Clean data → signal → human review → action',['Data quality gates','Human approval','Model monitoring'],['Bad data','Unaccountable automation'],['Forecast error','Alert precision']]
+];
+// grid position: col,row — a clear top-down tier layout (governance → control/systems → operations → execution)
+const POS={
+ owner:{c:4,r:0}, hq:{c:4,r:1},
+ finance:{c:0,r:2}, audit:{c:2,r:2}, master:{c:4,r:2}, bi:{c:6,r:2}, erp:{c:8,r:2}, ai:{c:9,r:2},
+ spine:{c:8,r:3},
+ warehouse:{c:1,r:4}, pharmacy:{c:3,r:4}, gym:{c:5,r:4}, future:{c:7,r:4},
+ purchasing:{c:1,r:5}, pos:{c:3,r:5}
+};
+const classMap={Governance:'gov',HQ:'gov',Control:'control',Operations:'process',Process:'process',Business:'business',Information:'info',System:'system',Future:'future'};
+const by={}; data.forEach(n=>by[n[0]]=n);
+const world=document.getElementById('world'), zoomEl=document.getElementById('zoom'), canvas=document.getElementById('canvas'), svg=document.getElementById('edges');
+const svgNS='http://www.w3.org/2000/svg';
+
+const COLW=190, ROWH=160, PAD=100;
+const cols=Object.values(POS).map(p=>p.c), rows=Object.values(POS).map(p=>p.r);
+const worldW=(Math.max(...cols)-Math.min(...cols))*COLW+PAD*2;
+const worldH=(Math.max(...rows)-Math.min(...rows))*ROWH+PAD*2;
+world.style.width=worldW+'px'; world.style.height=worldH+'px';
+svg.setAttribute('width',worldW); svg.setAttribute('height',worldH);
+svg.setAttribute('viewBox',`0 0 ${worldW} ${worldH}`);
+function cx(id){return PAD+POS[id].c*COLW}
+function cy(id){return PAD+POS[id].r*ROWH}
+
+data.forEach(n=>{
+ const d=document.createElement('div');
+ d.className='node '+(classMap[n[2]]||'');
+ d.style.left=(cx(n[0])-75)+'px'; d.style.top=(cy(n[0])-38)+'px';
+ d.innerHTML=`<div class="type">${n[2]}</div><div class="name">${n[1]}</div>`;
+ d.onclick=()=>select(n);
+ world.appendChild(d);
+ n.el=d;
+});
+data.forEach(n=>{
+ const l=parseFloat(n.el.style.left), t=parseFloat(n.el.style.top);
+ n.rect={l,t,w:n.el.offsetWidth,h:n.el.offsetHeight,cx:l+n.el.offsetWidth/2,cy:t+n.el.offsetHeight/2};
+});
+
+function port(n,side){const r=n.rect;return side==='top'?{x:r.cx,y:r.t}:{x:r.cx,y:r.t+r.h}}
+function elbow(aId,bId,cls,flow){
+ const A=by[aId], B=by[bId], Ar=A.rect, Br=B.rect;
+ let pts;
+ if(Math.abs(Ar.cx-Br.cx)<4){
+  pts = Ar.cy<Br.cy ? [port(A,'bottom'),port(B,'top')] : [port(A,'top'),port(B,'bottom')];
+ } else if(Math.abs(Ar.cy-Br.cy)<4){
+  const laneY=Math.max(Ar.cy,Br.cy)+Ar.h/2+16;
+  pts=[port(A,'bottom'),{x:Ar.cx,y:laneY},{x:Br.cx,y:laneY},port(B,'bottom')];
+ } else {
+  const laneY=(Ar.cy+Br.cy)/2;
+  pts = Ar.cy<Br.cy
+   ? [port(A,'bottom'),{x:Ar.cx,y:laneY},{x:Br.cx,y:laneY},port(B,'top')]
+   : [port(A,'top'),{x:Ar.cx,y:laneY},{x:Br.cx,y:laneY},port(B,'bottom')];
+ }
+ const d='M'+pts.map(p=>`${p.x},${p.y}`).join(' L ');
+ const path=document.createElementNS(svgNS,'path');
+ path.setAttribute('d',d); path.setAttribute('fill','none');
+ path.setAttribute('stroke-linejoin','round');
+ path.setAttribute('stroke', flow?'var(--line-flow)':cls==='control'?'var(--line-control)':'var(--line)');
+ path.setAttribute('stroke-width', flow?2.6:1.6);
+ if(cls==='control'&&!flow) path.setAttribute('stroke-dasharray','4,3');
+ if(flow){ path.setAttribute('marker-end','url(#arrow)'); path.style.display='none'; path.dataset.flow='1'; }
+ svg.appendChild(path);
+ return path;
+}
+const defs=document.createElementNS(svgNS,'defs');
+defs.innerHTML=`<marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="var(--line-flow)"/></marker>`;
+svg.appendChild(defs);
+
+const edges=[
+['owner','hq',''],['hq','finance','control'],['hq','audit','control'],['hq','warehouse',''],
+['hq','pharmacy',''],['hq','master','control'],['hq','bi','control'],['hq','erp','control'],
+['warehouse','purchasing',''],['warehouse','spine',''],['warehouse','pharmacy',''],
+['pharmacy','pos',''],['pharmacy','master','control'],['finance','erp','control'],['audit','erp','control'],
+['bi','erp','control'],['erp','ai',''],['hq','gym',''],['hq','future',''],['spine','erp','control']
+];
+edges.forEach(e=>elbow(e[0],e[1],e[2]));
+const flowPairs=[['pharmacy','warehouse'],['warehouse','pharmacy'],['pharmacy','finance'],['warehouse','finance'],['purchasing','finance'],['finance','erp'],['erp','bi'],['bi','hq'],['erp','audit'],['erp','ai']];
+const flowEdges=flowPairs.map(e=>elbow(e[0],e[1],'',true));
+let flowsOn=false;
+function flows(){flowsOn=!flowsOn;flowEdges.forEach(e=>e.style.display=flowsOn?'block':'none');document.getElementById('flowBtn').classList.toggle('active',flowsOn)}
+
+function select(n){
+ data.forEach(x=>x.el.classList.remove('sel')); n.el.classList.add('sel');
+ document.getElementById('content').innerHTML=`<div class="eyebrow">${n[2]}</div><h2>${n[1]}</h2>
+ <div>${n[3]==='control'?'<span class="pill green">Control</span>':'<span class="pill">Operating node</span>'}</div>
+ <div class="section"><h3>Responsibility</h3><ul>${n[4].map(x=>`<li>${x}</li>`).join('')}</ul></div>
+ <div class="section"><h3>Reporting / position</h3><p>${n[5]}</p></div>
+ <div class="section"><h3>Transaction / information flow</h3><p>${n[6]}</p></div>
+ <div class="section"><h3>Controls</h3>${n[7].map(x=>`<span class="pill green">${x}</span>`).join('')}</div>
+ <div class="section"><h3>Key risks</h3>${n[8].map(x=>`<span class="pill red">${x}</span>`).join('')}</div>
+ <div class="section"><h3>KPIs</h3><ul>${n[9].map(x=>`<li>${x}</li>`).join('')}</ul></div>
+ <div class="section"><h3>Design status</h3><p><span class="pill">Initial future-state recommendation</span> Validate against actual people, legal entities, reporting lines and transaction evidence.</p></div>`;
+ document.getElementById('sheet').classList.add('open');
+}
+function closeSheet(){document.getElementById('sheet').classList.remove('open');data.forEach(x=>x.el.classList.remove('sel'))}
+function layer(x){
+ data.forEach(n=>{n.el.style.opacity=(x==='org'||(x==='control'&&n[3]==='control')||(x==='finance'&&n[3]==='finance'))?'1':'.2'});
+ document.querySelectorAll('#btnrow button').forEach(b=>b.classList.remove('active'));
+ event.target.classList.add('active');
+}
+
+let tx=0,ty=0,zm=1;
+function applyT(){zoomEl.style.transform=`translate3d(${tx}px,${ty}px,0) scale(${zm})`}
+function fit(){
+ const cw=canvas.clientWidth,ch=canvas.clientHeight;
+ zm=Math.max(.18,Math.min(Math.min(cw/worldW,ch/worldH)*0.94,1));
+ tx=(cw-worldW*zm)/2; ty=(ch-worldH*zm)/2;
+ applyT();
+}
+function home(){fit()}
+function zoomBy(f){
+ const cw=canvas.clientWidth,ch=canvas.clientHeight,cxp=cw/2,cyp=ch/2;
+ const wx=(cxp-tx)/zm, wy=(cyp-ty)/zm;
+ zm=Math.max(.12,Math.min(3,zm*f));
+ tx=cxp-wx*zm; ty=cyp-wy*zm;
+ applyT();
+}
+window.addEventListener('resize',fit);
+fit();
+
+const pointers=new Map();
+let panStart=null, pinchStart=null;
+canvas.addEventListener('pointerdown',e=>{
+ canvas.setPointerCapture(e.pointerId);
+ pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(pointers.size===1){panStart={x:e.clientX,y:e.clientY,tx,ty};canvas.classList.add('drag')}
+ else if(pointers.size===2){
+  const pts=[...pointers.values()];
+  const dist=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
+  const mid={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2};
+  pinchStart={dist,zm,tx,ty,mid};
+ }
+});
+canvas.addEventListener('pointermove',e=>{
+ if(!pointers.has(e.pointerId))return;
+ pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(pointers.size===1&&panStart){
+  tx=panStart.tx+(e.clientX-panStart.x); ty=panStart.ty+(e.clientY-panStart.y);
+  applyT();
+ } else if(pointers.size===2&&pinchStart){
+  const pts=[...pointers.values()];
+  const dist=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
+  const ratio=dist/pinchStart.dist;
+  zm=Math.max(.12,Math.min(3,pinchStart.zm*ratio));
+  const rect=canvas.getBoundingClientRect();
+  const cxx=pinchStart.mid.x-rect.left, cyy=pinchStart.mid.y-rect.top;
+  const wx=(cxx-pinchStart.tx)/pinchStart.zm, wy=(cyy-pinchStart.ty)/pinchStart.zm;
+  tx=cxx-wx*zm; ty=cyy-wy*zm;
+  applyT();
+ }
+});
+function endP(e){
+ pointers.delete(e.pointerId);
+ canvas.classList.remove('drag');
+ if(pointers.size<2)pinchStart=null;
+ if(pointers.size<1)panStart=null;
+ else if(pointers.size===1){const p=[...pointers.values()][0];panStart={x:p.x,y:p.y,tx,ty}}
+}
+canvas.addEventListener('pointerup',endP);
+canvas.addEventListener('pointercancel',endP);
+canvas.addEventListener('wheel',e=>{e.preventDefault();zoomBy(e.deltaY>0?.9:1.1)},{passive:false});
+</script>
+</body>
+</html>
